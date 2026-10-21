@@ -1,0 +1,10 @@
+empty
+part1
+*.exe
+*.o
+*.ko
+*.mod
+*.mod.c
+*.symvers
+*.order
+.*.cmd
