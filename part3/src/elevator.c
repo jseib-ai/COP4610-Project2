@@ -35,13 +35,13 @@ struct pet
     struct list_head list;
 };
 
-struct floor_data 
+struct floorData 
 {
     struct list_head pet;
     int numPets;
 };
 
-struct elevator_data 
+struct elevatorData 
 {
     int state;
     int currentFloor;
@@ -55,5 +55,5 @@ struct elevator_data
 };
 
 
-module_init(elevator_init);
-module_exit(elevator_exit);
+module_init(elevator_init); //initialize
+module_exit(elevator_exit); //cleanup
