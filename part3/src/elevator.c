@@ -18,7 +18,7 @@ MODULE_DESCRIPTION("Elevator Kernel Module");
 #define DOWN     4
 
 //Ellevator declarations
-#define MAX_PASSENGERS 5
+#define MAX_PETS 5
 #define MAX_WEIGHT 50
 
 //Pet syscall declarations
@@ -62,30 +62,72 @@ struct elevatorInfo //defining the elevator
 };
 
 static struct elevatorInfo elevator;
-static struct proc_dir_entry *proc_entry;
+static struct mutex elevatorMutex;
+static struct procDirEntry *procEntry;
 
-extern int (*STUB_start_elevator)(void);
-extern int (*STUB_issue_request)(int, int, int);
-extern int (*STUB_stop_elevator)(void);
+extern int (*STUB_startElevator)(void);
+extern int (*STUB_issueRequest)(int, int, int);
+extern int (*STUB_stopElevator)(void);
 
-static int weightAcquire(int type) 
+static int __init elevatorInit(void) //initating the elevator
 {
-    switch (type)
-        {
-            case CHIHUAHUA: 
-                return CHIHUAHUA_WEIGHT;
-            case PUG: 
-                return PUG_WEIGHT;
-            case PUGHUAHUA: 
-                return PUGHUAHUA_WEIGHT;
-            case CHIHUAHUA: 
-                return DACHSHUND_WEIGHT;
-            default:
-                return 0;
-        }
+    int i;
+    mutex_init(&elevatorMutex);
+
+    elevator.state = OFFLINE;
+    elevator.currentFloor = 1;
+    elevator.currentWeight = 0;
+    elevator.numPets = 0;
+    elevator.totalServiced = 0;
+    elevator.totalWaiting = 0;
+    elevator.stopping = 0;
+    INIT_LIST_HEAD(&elevator.pets);
+
+    for (i = 0; i < MAX_FLOORS; i++) 
+    {
+        INIT_LIST_HEAD(&floors[i].pets);
+        floors[i].numPets = 0;
+    }
+
+    STUB_startElevator = startElevator_fn;
+    STUB_issueRequest  = issueRequest_fn;
+    STUB_stopElevator  = stopElevator_fn;
+
+    elevator.thread = kthread_run(elevatorThread_fn, NULL, "elevatorThread");
+    if (IS_ERR(elevator.thread)) {
+        printk(KERN_ERR "elevator: failed to create thread\n");
+        return PTR_ERR(elevator.thread);
+    }
+
+    proc_entry = proc_create("elevator", 0, NULL, &elevatorFops);
+    if (!proc_entry) 
+    {
+        kthread_stop(elevator.thread);
+        return -ENOMEM;
+    }
+
+    printk(KERN_INFO "Pet Elevator: module loaded\n");
+    return 0;
 }
 
-static char get_type_char(int type) 
+static int weightAcquire(int type) //Pet determines weight
+{
+    switch (type)
+    {
+        case CHIHUAHUA: 
+            return CHIHUAHUA_WEIGHT;
+        case PUG: 
+            return PUG_WEIGHT;
+        case PUGHUAHUA: 
+            return PUGHUAHUA_WEIGHT;
+        case CHIHUAHUA: 
+            return DACHSHUND_WEIGHT;
+        default:
+            return 0;
+    }
+}
+
+static char PetID(int type) 
     {
     switch (type)
         {
@@ -102,22 +144,48 @@ static char get_type_char(int type)
         }
 }
 
+static void loadPets(void) 
+{
+    struct pet *p, *tmp;
+    int floor_idx = elevator.currentFloor - 1;
+
+    list_for_each_entry_safe(p, tmp, &floors[floor_idx].pets, list) 
+    {
+        if (elevator.numPets >= MAX_PETS)
+            break;
+        if (elevator.currentWeight + p->weight > MAX_WEIGHT)
+            break;
+        list_del(&p->list);
+        floors[floor_idx].numPets--;
+        elevator.totalWaiting--;
+        list_add_tail(&p->list, &elevator.pets);
+        elevator.numPets++;
+        elevator.currentWeight += p->weight;
+        ssleep(1);
+    }
+}
+
 static void petUnload(void) //for unloading the pets
 {
     struct pet *p, *tmp;
     list_for_each_entry_safe(p, tmp, &elevator.pets, list)
+    {
+        if (p->dest == elevator.currentFloor) 
         {
-            /*if (p->dest_floor == elevator.current_floor) {
-            elevator.current_weight -= p->weight;
-            elevator.num_passengers--;
-            elevator.total_serviced++;
+            elevator.currentWeight -= p->weight;
+            elevator.numPets--;
+            elevator.totalServiced++;
             list_del(&p->list);
             kfree(p);
             ssleep(1);
         }
-    }*/
+    }
 }
 
+static int openProc(struct inode *inode, struct file *file) 
+{
+    return single_open(file, showProc, NULL);
+}
 
 //https://github.com/OS-Project-2/linux-kernel-elevator-scheduler/blob/master/part3/src/elevator.c#L356 (Link I found for a similar project)
 module_init(elevator_init); //initialize
