@@ -97,11 +97,11 @@ static int __init elevatorInit(void) //initating the elevator
         floors[i].numPets = 0;
     }
 
-    STUB_startElevator = startElevator_fn;
-    STUB_issueRequest = issueRequest_fn;
-    STUB_stopElevator = stopElevator_fn;
+    STUB_startElevator = startElevator;
+    STUB_issueRequest = floorRequest;
+    STUB_stopElevator = stopElevator;
 
-    elevator.thread = kthread_run(elevatorThread_fn, NULL, "elevatorThread");
+    elevator.thread = kthread_run(elevatorThread, NULL, "elevatorThread");
     if (IS_ERR(elevator.thread)) 
     {
         printk(KERN_ERR "elevator: failed to create thread\n");
@@ -119,7 +119,7 @@ static int __init elevatorInit(void) //initating the elevator
     return 0;
 }
 
-static void __exit elevatorTerminate(void) //terminates the elevator module
+static void __exit elevatorExit(void) //terminates the elevator module
 {
     struct pet *p, *tmp;
     int i;
@@ -184,7 +184,7 @@ static char PetID(int type)
         }
 }
 
-static void loadPets(void) //loading the pets onto the elevator
+static void petLoad (void) //loading the pets onto the elevator
 {
     struct pet *p, *tmp;
     int indexfloor = elevator.currentFloor - 1;
@@ -290,7 +290,7 @@ static int belowPets(void) //checks to see if there's pets below
     }
     for (i = elevator.currentFloor; i > 0; i--) 
     {
-        if (floors[i].num_passengers > 0)
+        if (floors[i].num_passengers > 1)
             return 1;
     }
     return 0;
@@ -325,6 +325,87 @@ static int floorRequest(int start, int dest, int type) //implementing requesting
     elevator.totalWaiting++;
     mutex_unlock(&elevatorMutex);
 
+    return 0;
+}
+
+static int elevatorThread(void *data) //The main logic for moving across floors
+{
+    while (!kthread_should_stop()) 
+    {
+        mutex_lock(&elevatorMutex);
+
+        if (elevator.state == OFFLINE) 
+        {
+            mutex_unlock(&elevator_mutex);
+            ssleep(1);
+            continue;
+        }
+
+        if (elevator.state == IDLE) 
+        {
+            if (waitingPets()) 
+            {
+                if (abovePets())
+                    elevator.state = UP;
+                else
+                    elevator.state = DOWN;
+            } 
+            else if (elevator.stop && elevator.numPets == 0) 
+                    elevator.state = OFFLINE;
+        
+            mutex_unlock(&elevatorMutex);
+            ssleep(1);
+            continue;
+        }
+
+        elevator.state = LOADING;
+        mutex_unlock(&elevatorMutex);
+
+        mutex_lock(&elevatorMutex);
+        petUnload();
+        petLoad();
+        mutex_unlock(&elevatorMutex);
+
+        mutex_lock(&elevatorMutex);
+        if (elevator.stopping) 
+        {
+            if (elevator.numPets == 0 && !waitingPets()) 
+            {
+                elevator.state = OFFLINE;
+                mutex_unlock(&elevatorMutex);
+                continue;
+            }
+        }
+
+        if (abovePets()) 
+        {
+            elevator.state = UP;
+            mutex_unlock(&elevator_mutex);
+            ssleep(2);
+            mutex_lock(&elevatorMutex);
+            if (elevator.currentFloor < MAX_FLOORS)
+                elevator.currentFloor++;
+            mutex_unlock(&elevatorMutex);
+        } 
+        else if (belowPets()) 
+        {
+            elevator.state = DOWN;
+            mutex_unlock(&elevatorMutex);
+            ssleep(2);
+            mutex_lock(&elevatorMutex);
+            if (elevator.currentFloor > 1)
+                elevator.currentFloor--;
+            mutex_unlock(&elevatorMutex);
+        } 
+        else 
+        {
+            elevator.state = IDLE;
+            mutex_unlock(&elevatorMutex);
+        }
+
+        continue;
+        mutex_unlock(&elevatorMutex);
+    }
     return 0;
 }
 
@@ -390,6 +471,5 @@ static int showProc(struct seq_file *m, void *v)
     return 0;
 }
 
-//https://github.com/OS-Project-2/linux-kernel-elevator-scheduler/blob/master/part3/src/elevator.c#L356 (Link I found for a similar project)
-module_init(elevator_init); //initialize
-module_exit(elevator_exit); //cleanup
+module_init(elevatorInit); //initialize
+module_exit(elevatorExit); //cleanup
