@@ -187,7 +187,15 @@ static int openProc(struct inode *inode, struct file *file)
     return single_open(file, showProc, NULL);
 }
 
-static int openProc(struct seq_file *m, void *v) {
+static const struct procOps elevatorFops = {
+    .proc_open = openProc,
+    .proc_read = seqRead,
+    .proc_lseek = seqLseek,
+    .proc_release = singleRelease, }; //operations for the procs
+
+
+static int showProc(struct seq_file *m, void *v) 
+{
     struct pet *p;
     int i;
     char *stateStr;
@@ -221,13 +229,15 @@ static int openProc(struct seq_file *m, void *v) {
     }
     seq_printf(m, "\n\n");
 
-    for (i = MAX_FLOORS; i >= 1; i--) {
+    for (i = MAX_FLOORS; i >= 1; i--) 
+    {
         int floor_idx = i - 1;
         seq_printf(m, "[%s] Floor %d: %d",
                    elevator.current_floor == i ? "*" : " ",
                    i,
                    floors[floor_idx].num_passengers);
-        list_for_each_entry(p, &floors[floor_idx].passengers, list) {
+        list_for_each_entry(p, &floors[floor_idx].passengers, list) 
+        {
             seq_printf(m, " %c%d", get_type_char(p->type), p->dest_floor);
         }
         seq_printf(m, "\n");
