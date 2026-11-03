@@ -90,8 +90,8 @@ static int __init elevatorInit(void) //initating the elevator
     }
 
     STUB_startElevator = startElevator_fn;
-    STUB_issueRequest  = issueRequest_fn;
-    STUB_stopElevator  = stopElevator_fn;
+    STUB_issueRequest = issueRequest_fn;
+    STUB_stopElevator = stopElevator_fn;
 
     elevator.thread = kthread_run(elevatorThread_fn, NULL, "elevatorThread");
     if (IS_ERR(elevator.thread)) {
@@ -185,6 +185,60 @@ static void petUnload(void) //for unloading the pets
 static int openProc(struct inode *inode, struct file *file) 
 {
     return single_open(file, showProc, NULL);
+}
+
+static int openProc(struct seq_file *m, void *v) {
+    struct pet *p;
+    int i;
+    char *stateStr;
+
+    mutex_lock(&elevator_mutex);
+
+    switch (elevator.state) 
+    {
+        case OFFLINE:  
+            stateStr = "OFFLINE";  break;
+        case IDLE:     
+            stateStr = "IDLE";     break;
+        case LOADING:  
+            stateStr = "LOADING";  break;
+        case UP:       
+            stateStr = "UP";       break;
+        case DOWN:     
+            stateStr = "DOWN";     break;
+        default:       
+            stateStr = "UNKNOWN";  break;
+    }
+
+    seq_printf(m, "Elevator state: %s\n", state_str);
+    seq_printf(m, "Current floor: %d\n", elevator.currentFloor);
+    seq_printf(m, "Current load: %d lbs\n", elevator.currentWeight);
+
+    seq_printf(m, "Elevator status:");
+    list_for_each_entry(p, &elevator.pets, list) 
+    {
+        seq_printf(m, " %c%d", get_type_char(p->type), p->dest);
+    }
+    seq_printf(m, "\n\n");
+
+    for (i = MAX_FLOORS; i >= 1; i--) {
+        int floor_idx = i - 1;
+        seq_printf(m, "[%s] Floor %d: %d",
+                   elevator.current_floor == i ? "*" : " ",
+                   i,
+                   floors[floor_idx].num_passengers);
+        list_for_each_entry(p, &floors[floor_idx].passengers, list) {
+            seq_printf(m, " %c%d", get_type_char(p->type), p->dest_floor);
+        }
+        seq_printf(m, "\n");
+    }
+
+    seq_printf(m, "\nNumber of passengers: %d\n", elevator.num_passengers);
+    seq_printf(m, "Number of passengers waiting: %d\n", elevator.total_waiting);
+    seq_printf(m, "Number of passengers serviced: %d\n", elevator.total_serviced);
+
+    mutex_unlock(&elevatorMutex);
+    return 0;
 }
 
 //https://github.com/OS-Project-2/linux-kernel-elevator-scheduler/blob/master/part3/src/elevator.c#L356 (Link I found for a similar project)
