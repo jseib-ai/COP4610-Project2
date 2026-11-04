@@ -70,9 +70,9 @@ static struct floorInfo floors[MAX_FLOORS];
 static struct mutex elevatorMutex;
 static struct proc_dir_entry *proc_entry;
 
-extern int (*STUB_start_Elevator)(void);
-extern int (*STUB_issue_Request)(int, int, int);
-extern int (*STUB_stop_Elevator)(void);
+extern int (*STUB_start_elevator)(void);
+extern int (*STUB_issue_request)(int, int, int);
+extern int (*STUB_stop_elevator)(void);
 
 static void __exit elevatorExit(void) //terminates the elevator module
 {
