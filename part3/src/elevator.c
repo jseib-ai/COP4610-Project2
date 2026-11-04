@@ -181,12 +181,14 @@ static void petUnload(void) //for unloading the pets
 static int startElevator(void)
 {
     mutex_lock(&elevatorMutex);
-    if (elevator.state == OFFLINE) //ensures that the elevator doesn't move after going offline
+    if (elevator.state != OFFLINE) //ensures that the elevator doesn't move after going offline
     {
         mutex_unlock(&elevatorMutex);
         return 1;
     }
     elevator.state = IDLE;
+    elevator.currentFloor = 1;
+    elevator.currentWeight = 0;
     elevator.stop = 0;
     mutex_unlock(&elevatorMutex);
     return 0;
@@ -438,7 +440,7 @@ static int __init elevatorInit(void) //initating the elevator
     int i;
     mutex_init(&elevatorMutex);
 
-    elevator.state = IDLE;
+    elevator.state = OFFLINE;
     elevator.currentFloor = 1;
     elevator.currentWeight = 0;
     elevator.numPets = 0;
