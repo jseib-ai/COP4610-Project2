@@ -292,33 +292,42 @@ static int floorRequest(int start, int dest, int type) //implementing requesting
     return 0;
 }
 
-static int elevatorThread(void *data) //The main logic for moving across floors
+
+
+static int elevatorThread(void *data) //main logic for moving between floors
 {
     int moved;
-    
-    while (!kthread_should_stop()) 
+    int hasAbove;
+    int hasBelow;
+
+    while (!kthread_should_stop())
     {
         mutex_lock(&elevatorMutex);
 
-        if (elevator.state == OFFLINE) 
+        if (elevator.state == OFFLINE)
         {
             mutex_unlock(&elevatorMutex);
             ssleep(1);
             continue;
         }
 
-        if (elevator.state == IDLE) 
+        if (elevator.state == IDLE)
         {
             if (elevator.stop && elevator.numPets == 0)
+            {
                 elevator.state = OFFLINE;
-            else if (waitingPets()) 
+                mutex_unlock(&elevatorMutex);
+                continue;
+            }
+
+            if (waitingPets())
             {
                 if (abovePets())
                     elevator.state = UP;
                 else
                     elevator.state = DOWN;
             }
-        
+
             mutex_unlock(&elevatorMutex);
             ssleep(1);
             continue;
@@ -328,53 +337,106 @@ static int elevatorThread(void *data) //The main logic for moving across floors
         mutex_unlock(&elevatorMutex);
 
         mutex_lock(&elevatorMutex);
+
         moved = petUnload();
-        if(!elevator.stop)
+
+        if (!elevator.stop)
             moved += petLoad();
+
         mutex_unlock(&elevatorMutex);
-        if(moved)
+
+        if (moved)
             ssleep(1);
 
-        
         mutex_lock(&elevatorMutex);
-        if (elevator.stop) 
+
+        if (elevator.stop && elevator.numPets == 0)
         {
-            if (elevator.numPets == 0) 
+            elevator.state = OFFLINE;
+            mutex_unlock(&elevatorMutex);
+            continue;
+        }
+
+        hasAbove = 0;
+        hasBelow = 0;
+
+        /* Check destinations of pets already inside */
+        {
+            struct pet *p;
+
+            list_for_each_entry(p, &elevator.pets, list)
             {
-                elevator.state = OFFLINE;
-                mutex_unlock(&elevatorMutex);
-                continue;
+                if (p->dest > elevator.currentFloor)
+                    hasAbove = 1;
+
+                if (p->dest < elevator.currentFloor)
+                    hasBelow = 1;
             }
         }
 
-        if (abovePets()) 
+        /* During shutdown, ignore waiting pets */
+        if (elevator.stop)
         {
-            elevator.state = UP;
+            if (hasAbove)
+                elevator.state = UP;
+            else if (hasBelow)
+                elevator.state = DOWN;
+            else if (elevator.numPets == 0)
+                elevator.state = OFFLINE;
+
             mutex_unlock(&elevatorMutex);
             ssleep(2);
+            continue;
+        }
+
+        /* Prioritize passengers already aboard */
+        if (hasAbove && !hasBelow)
+            elevator.state = UP;
+        else if (hasBelow && !hasAbove)
+            elevator.state = DOWN;
+        else if (hasAbove && hasBelow)
+        {
+            if (elevator.state == UP)
+                elevator.state = UP;
+            else
+                elevator.state = DOWN;
+        }
+        else if (abovePets())
+            elevator.state = UP;
+        else if (belowPets())
+            elevator.state = DOWN;
+        else
+            elevator.state = IDLE;
+
+        if (elevator.state == UP)
+        {
+            mutex_unlock(&elevatorMutex);
+            ssleep(2);
+
             mutex_lock(&elevatorMutex);
             if (elevator.currentFloor < MAX_FLOORS)
                 elevator.currentFloor++;
             mutex_unlock(&elevatorMutex);
-        } 
-        else if (belowPets()) 
+        }
+        else if (elevator.state == DOWN)
         {
-            elevator.state = DOWN;
             mutex_unlock(&elevatorMutex);
             ssleep(2);
+
             mutex_lock(&elevatorMutex);
             if (elevator.currentFloor > 1)
                 elevator.currentFloor--;
             mutex_unlock(&elevatorMutex);
-        } 
-        else 
+        }
+        else
         {
-            elevator.state = IDLE;
             mutex_unlock(&elevatorMutex);
         }
     }
+
     return 0;
 }
+
 
 
 
