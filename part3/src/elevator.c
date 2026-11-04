@@ -70,18 +70,18 @@ static struct floorInfo floors[MAX_FLOORS];
 static struct mutex elevatorMutex;
 static struct proc_dir_entry *proc_entry;
 
-extern int (*STUB_startElevator)(void);
-extern int (*STUB_issueRequest)(int, int, int);
-extern int (*STUB_stopElevator)(void);
+extern int (*STUB_start_Elevator)(void);
+extern int (*STUB_issue_Request)(int, int, int);
+extern int (*STUB_stop_Elevator)(void);
 
 static void __exit elevatorExit(void) //terminates the elevator module
 {
     struct pet *p, *tmp;
     int i;
 
-    STUB_startElevator = NULL;
-    STUB_issueRequest = NULL;
-    STUB_stopElevator = NULL;
+    STUB_start_Elevator = NULL;
+    STUB_issue_Request = NULL;
+    STUB_stop_Elevator = NULL;
 
     kthread_stop(elevator.thread);
     proc_remove(proc_entry);
@@ -453,9 +453,9 @@ static int __init elevatorInit(void) //initating the elevator
         floors[i].numPets = 0;
     }
 
-    STUB_startElevator = startElevator;
-    STUB_issueRequest = floorRequest;
-    STUB_stopElevator = stopElevator;
+    STUB_start_Elevator = startElevator;
+    STUB_issue_Request = floorRequest;
+    STUB_stop_Elevator = stopElevator;
 
     elevator.thread = kthread_run(elevatorThread, NULL, "elevatorThread");
     if (IS_ERR(elevator.thread)) 
