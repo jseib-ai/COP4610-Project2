@@ -17,7 +17,7 @@ A Linux kernel module that simulates an elevator system transporting different t
 ### Part 3: Elevator Kernel Module
   - Kernel compilation and syscall testing - John
   - Implement the elevator kernel module - Nathan
-  - Manage elevator states: OFFLINE, IDLE, LOADING, UP, and DOWN - John
+  - Manage elevator states: OFFLINE, IDLE, LOADING, UP, and DOWN - Nathan
   - Implement pet loading and unloading - Nathan
   - Enforce elevator capacity and weight restrictions - Nathan
   - Implement elevator movement between floors - John
