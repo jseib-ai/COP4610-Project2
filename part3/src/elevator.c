@@ -295,6 +295,8 @@ static int floorRequest(int start, int dest, int type) //implementing requesting
 
 static int elevatorThread(void *data) //The main logic for moving across floors
 {
+    int moved;
+    
     while (!kthread_should_stop()) 
     {
         mutex_lock(&elevatorMutex);
@@ -327,10 +329,14 @@ static int elevatorThread(void *data) //The main logic for moving across floors
         mutex_unlock(&elevatorMutex);
 
         mutex_lock(&elevatorMutex);
-        petUnload();
-        petLoad();
+        moved = petUnload();
+        if(!elevator.stop)
+            moved += petLoad();
         mutex_unlock(&elevatorMutex);
+        if(moved)
+            ssleep(1);
 
+        
         mutex_lock(&elevatorMutex);
         if (elevator.stop) 
         {
