@@ -300,15 +300,15 @@ static int elevatorThread(void *data) //The main logic for moving across floors
 
         if (elevator.state == IDLE) 
         {
-            if (waitingPets()) 
+            if (elevator.stop && elevator.numPets == 0)
+                elevator.state = OFFLINE;
+            else if (waitingPets()) 
             {
                 if (abovePets())
                     elevator.state = UP;
                 else
                     elevator.state = DOWN;
-            } 
-            else if (elevator.stop && elevator.numPets == 0) 
-                    elevator.state = OFFLINE;
+            }
         
             mutex_unlock(&elevatorMutex);
             ssleep(1);
@@ -326,7 +326,7 @@ static int elevatorThread(void *data) //The main logic for moving across floors
         mutex_lock(&elevatorMutex);
         if (elevator.stop) 
         {
-            if (elevator.numPets == 0 && !waitingPets()) 
+            if (elevator.numPets == 0) 
             {
                 elevator.state = OFFLINE;
                 mutex_unlock(&elevatorMutex);
@@ -455,9 +455,6 @@ static int __init elevatorInit(void) //initating the elevator
         floors[i].numPets = 0;
     }
 
-    STUB_start_Elevator = startElevator;
-    STUB_issue_Request = floorRequest;
-    STUB_stop_Elevator = stopElevator;
 
     elevator.thread = kthread_run(elevatorThread, NULL, "elevatorThread");
     if (IS_ERR(elevator.thread)) 
@@ -474,6 +471,11 @@ static int __init elevatorInit(void) //initating the elevator
     }
 
     printk(KERN_INFO "Pet Elevator: module loaded\n");
+
+    STUB_start_Elevator = startElevator;
+    STUB_issue_Request = floorRequest;
+    STUB_stop_Elevator = stopElevator;
+    
     return 0;
 }
 
