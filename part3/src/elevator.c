@@ -36,7 +36,7 @@ MODULE_DESCRIPTION("Elevator Kernel Module");
 
 struct pet //defining a pet
 {
-    int breed;
+    int type;
     int start;
     int dest;
     int weight;
@@ -45,7 +45,7 @@ struct pet //defining a pet
 
 struct floorInfo //defining a floor
 {
-    struct list_head pet;
+    struct list_head pets;
     int numPets;
 };
 
@@ -63,61 +63,13 @@ struct elevatorInfo //defining the elevator
 };
 
 static struct elevatorInfo elevator;
-static struct floorInfo floors[MAX_FLOORS]
+static struct floorInfo floors[MAX_FLOORS];
 static struct mutex elevatorMutex;
-static struct procDirEntry *procEntry;
-
-static const struct procOps elevatorFops = {
-    .proc_open = openProc,
-    .proc_read = seqRead,
-    .proc_lseek = seqLseek,
-    .proc_release = singleRelease, }; //operations for the procs
+static struct proc_dir_entry *proc_entry;
 
 extern int (*STUB_startElevator)(void);
 extern int (*STUB_issueRequest)(int, int, int);
 extern int (*STUB_stopElevator)(void);
-
-static int __init elevatorInit(void) //initating the elevator
-{
-    int i;
-    mutex_init(&elevatorMutex);
-
-    elevator.state = IDLE;
-    elevator.currentFloor = 1;
-    elevator.currentWeight = 0;
-    elevator.numPets = 0;
-    elevator.totalServiced = 0;
-    elevator.totalWaiting = 0;
-    elevator.stop = 0;
-    INIT_LIST_HEAD(&elevator.pets);
-
-    for (i = 0; i < MAX_FLOORS; i++) 
-    {
-        INIT_LIST_HEAD(&floors[i].pets);
-        floors[i].numPets = 0;
-    }
-
-    STUB_startElevator = startElevator;
-    STUB_issueRequest = floorRequest;
-    STUB_stopElevator = stopElevator;
-
-    elevator.thread = kthread_run(elevatorThread, NULL, "elevatorThread");
-    if (IS_ERR(elevator.thread)) 
-    {
-        printk(KERN_ERR "elevator: failed to create thread\n");
-        return PTR_ERR(elevator.thread);
-    }
-
-    proc_entry = proc_create("elevator", 0, NULL, &elevatorFops);
-    if (!proc_entry) 
-    {
-        kthread_stop(elevator.thread);
-        return -ENOMEM;
-    }
-
-    printk(KERN_INFO "Pet Elevator: module loaded\n");
-    return 0;
-}
 
 static void __exit elevatorExit(void) //terminates the elevator module
 {
@@ -131,7 +83,7 @@ static void __exit elevatorExit(void) //terminates the elevator module
     kthread_stop(elevator.thread);
     proc_remove(proc_entry);
 
-    mutex_lock(&elevator_mutex);
+    mutex_lock(&elevatorMutex);
     list_for_each_entry_safe(p, tmp, &elevator.pets, list) 
     {
         list_del(&p->list);
@@ -140,17 +92,17 @@ static void __exit elevatorExit(void) //terminates the elevator module
     
     for (i = 0; i < MAX_FLOORS; i++) 
     {
-        list_for_each_entry_safe(p, tmp, &floors[i].passengers, list)
+        list_for_each_entry_safe(p, tmp, &floors[i].pets, list)
         {
             list_del(&p->list);
             kfree(p);
         }
     }
-    mutex_unlock(&elevator_mutex);
+    mutex_unlock(&elevatorMutex);
     printk(KERN_INFO "elevator: module unloaded\n");
 }
 
-static int weightAcquire(int type) //Pet determines weight
+static int weightGet(int type) //Pet determines weight
 {
     switch (type)
     {
@@ -160,7 +112,7 @@ static int weightAcquire(int type) //Pet determines weight
             return PUG_WEIGHT;
         case PUGHUAHUA: 
             return PUGHUAHUA_WEIGHT;
-        case CHIHUAHUA: 
+        case DACHSHUND: 
             return DACHSHUND_WEIGHT;
         default:
             return 0;
@@ -172,22 +124,22 @@ static char PetID(int type)
     switch (type)
         {
             case CHIHUAHUA: 
-                return C;
+                return 'C';
             case PUG: 
-                return P;
+                return 'P';
             case PUGHUAHUA: 
-                return PC;
-            case CHIHUAHUA: 
-                return D;
+                return 'H';
+            case DACHSHUND: 
+                return 'D';
             default:
-                return ?;
+                return '?';
         }
 }
 
 static void petLoad (void) //loading the pets onto the elevator
 {
     struct pet *p, *tmp;
-    int indexfloor = elevator.currentFloor - 1;
+    int indexFloor = elevator.currentFloor - 1;
 
     list_for_each_entry_safe(p, tmp, &floors[indexFloor].pets, list) 
     {
@@ -226,12 +178,12 @@ static void petUnload(void) //for unloading the pets
 static int startElevator(void)
 {
     mutex_lock(&elevatorMutex);
-    if (elevator.state != OFFLINE) 
+    if (elevator.state == OFFLINE) //ensures that the elevator doesn't move after going offline
     {
         mutex_unlock(&elevatorMutex);
         return 1;
     }
-    elevator.statev= IDLE;
+    elevator.state = IDLE;
     elevator.stop = 0;
     mutex_unlock(&elevatorMutex);
     return 0;
@@ -240,7 +192,7 @@ static int startElevator(void)
 static int stopElevator(void) 
 {
     mutex_lock(&elevatorMutex);
-    if (elevator.stop) 
+    if (elevator.stop) //Condition for when you force the elevator to stop while it's stopped
     {
         mutex_unlock(&elevatorMutex);
         return 1;
@@ -256,11 +208,11 @@ static int abovePets(void) //checks to see if there's pets above
     struct pet *p;
     list_for_each_entry(p, &elevator.pets, list) 
     {
-        if (p->dest > elevator.currentFloor)
+        if (p->dest > elevator.currentFloor) //pets in the elevator
             return 1;
     }
     
-    for (i = elevator.currentFloor; i < MAX_FLOORS; i++) 
+    for (i = elevator.currentFloor; i < MAX_FLOORS; i++)  //Checking for pets on other floors
     {
         if (floors[i].numPets > 0)
             return 1;
@@ -268,7 +220,7 @@ static int abovePets(void) //checks to see if there's pets above
     return 0;
 }
 
-static int waitingPets(void) //checks to see if there's pets waiting on that floor
+static int waitingPets(void) //checks to see if there's pets waiting on floors
 {
     int i;
     for (i = 0; i < MAX_FLOORS; i++) 
@@ -288,9 +240,9 @@ static int belowPets(void) //checks to see if there's pets below
         if (p->dest < elevator.currentFloor)
             return 1;
     }
-    for (i = elevator.currentFloor; i > 0; i--) 
+    for (i = 0; i < elevator.currentFloor - 1; i++) 
     {
-        if (floors[i].num_passengers > 1)
+        if (floors[i].numPets > 0)
             return 1;
     }
     return 0;
@@ -305,7 +257,7 @@ static int floorRequest(int start, int dest, int type) //implementing requesting
         dest < 1 || dest > MAX_FLOORS ||
         start == dest ||
         type < 0 || type > 3)
-        return 1;
+        return 1; //For when the variables make no sense
 
     p = kmalloc(sizeof(*p), GFP_KERNEL);
     if (!p)
@@ -314,14 +266,14 @@ static int floorRequest(int start, int dest, int type) //implementing requesting
     p->type = type;
     p->start = start;
     p->dest = dest;
-    p->weight = get_weight(type);
+    p->weight = weightGet(type);
     INIT_LIST_HEAD(&p->list);
 
     indexFloor = start - 1;
 
     mutex_lock(&elevatorMutex);
     list_add_tail(&p->list, &floors[indexFloor].pets);
-    floors[indexFloor].num_Pets++;
+    floors[indexFloor].numPets++;
     elevator.totalWaiting++;
     mutex_unlock(&elevatorMutex);
 
@@ -336,7 +288,7 @@ static int elevatorThread(void *data) //The main logic for moving across floors
 
         if (elevator.state == OFFLINE) 
         {
-            mutex_unlock(&elevator_mutex);
+            mutex_unlock(&elevatorMutex);
             ssleep(1);
             continue;
         }
@@ -367,7 +319,7 @@ static int elevatorThread(void *data) //The main logic for moving across floors
         mutex_unlock(&elevatorMutex);
 
         mutex_lock(&elevatorMutex);
-        if (elevator.stopping) 
+        if (elevator.stop) 
         {
             if (elevator.numPets == 0 && !waitingPets()) 
             {
@@ -380,7 +332,7 @@ static int elevatorThread(void *data) //The main logic for moving across floors
         if (abovePets()) 
         {
             elevator.state = UP;
-            mutex_unlock(&elevator_mutex);
+            mutex_unlock(&elevatorMutex);
             ssleep(2);
             mutex_lock(&elevatorMutex);
             if (elevator.currentFloor < MAX_FLOORS)
@@ -402,17 +354,52 @@ static int elevatorThread(void *data) //The main logic for moving across floors
             elevator.state = IDLE;
             mutex_unlock(&elevatorMutex);
         }
-
-        continue;
-        mutex_unlock(&elevatorMutex);
     }
     return 0;
 }
 
-static int openProc(struct inode *inode, struct file *file) 
+static int __init elevatorInit(void) //initating the elevator
 {
-    return single_open(file, showProc, NULL);
+    int i;
+    mutex_init(&elevatorMutex);
+
+    elevator.state = IDLE;
+    elevator.currentFloor = 1;
+    elevator.currentWeight = 0;
+    elevator.numPets = 0;
+    elevator.totalServiced = 0;
+    elevator.totalWaiting = 0;
+    elevator.stop = 0;
+    INIT_LIST_HEAD(&elevator.pets); //declaration of elevator variables
+
+    for (i = 0; i < MAX_FLOORS; i++) 
+    {
+        INIT_LIST_HEAD(&floors[i].pets);
+        floors[i].numPets = 0;
+    }
+
+    STUB_startElevator = startElevator;
+    STUB_issueRequest = floorRequest;
+    STUB_stopElevator = stopElevator;
+
+    elevator.thread = kthread_run(elevatorThread, NULL, "elevatorThread");
+    if (IS_ERR(elevator.thread)) 
+    {
+        printk(KERN_ERR "elevator: failed to create thread\n");
+        return PTR_ERR(elevator.thread);
+    }
+
+    proc_entry = proc_create("elevator", 0444, NULL, &elevatorFops);
+    if (!proc_entry) 
+    {
+        kthread_stop(elevator.thread);
+        return -ENOMEM;
+    }
+
+    printk(KERN_INFO "Pet Elevator: module loaded\n");
+    return 0;
 }
+
 
 static int showProc(struct seq_file *m, void *v) 
 {
@@ -420,7 +407,7 @@ static int showProc(struct seq_file *m, void *v)
     int i;
     char *stateStr;
 
-    mutex_lock(&elevator_mutex);
+    mutex_lock(&elevatorMutex);
 
     switch (elevator.state) 
     {
@@ -438,14 +425,14 @@ static int showProc(struct seq_file *m, void *v)
             stateStr = "UNKNOWN"; break;
     }
 
-    seq_printf(m, "Elevator state: %s\n", state_str);
+    seq_printf(m, "Elevator state: %s\n", stateStr);
     seq_printf(m, "Current floor: %d\n", elevator.currentFloor);
     seq_printf(m, "Current load: %d lbs\n", elevator.currentWeight);
 
     seq_printf(m, "Elevator status:");
     list_for_each_entry(p, &elevator.pets, list) 
     {
-        seq_printf(m, " %c%d", get_type_char(p->type), p->dest);
+        seq_printf(m, " %c%d", PetID(p->type), p->dest);
     }
     seq_printf(m, "\n\n");
 
@@ -456,9 +443,9 @@ static int showProc(struct seq_file *m, void *v)
                    elevator.currentFloor == i ? "*" : " ",
                    i,
                    floors[indexFloor].numPets);
-        list_for_each_entry(p, &floors[floor_idx].pets, list) 
+        list_for_each_entry(p, &floors[indexFloor].pets, list) 
         {
-            seq_printf(m, " %c%d", get_type_char(p->type), p->dest);
+            seq_printf(m, " %c%d", PetID(p->type), p->dest);
         }
         seq_printf(m, "\n");
     }
@@ -470,6 +457,17 @@ static int showProc(struct seq_file *m, void *v)
     mutex_unlock(&elevatorMutex);
     return 0;
 }
+
+static int open_proc(struct inode *inode, struct file *file) 
+{
+    return single_open(file, showProc, NULL);
+}
+
+static const struct proc_ops elevatorFops = {
+    .proc_open = open_proc,
+    .proc_read = seq_read,
+    .proc_lseek = seq_lseek,
+    .proc_release = single_release, }; //operations for the procs
 
 module_init(elevatorInit); //initialize
 module_exit(elevatorExit); //cleanup
