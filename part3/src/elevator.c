@@ -138,7 +138,7 @@ static char PetID(int type)
         }
 }
 
-static void petLoad (void) //loading the pets onto the elevator
+static int petLoad (void) //loading the pets onto the elevator
 {
     struct pet *p, *tmp;
     int indexFloor = elevator.currentFloor - 1;
@@ -165,7 +165,7 @@ static void petLoad (void) //loading the pets onto the elevator
 
 
 
-static void petUnload(void) //for unloading the pets
+static int petUnload(void) //for unloading the pets
 {
     struct pet *p, *tmp;
     int unloaded = 0;
