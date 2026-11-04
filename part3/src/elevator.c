@@ -79,9 +79,9 @@ static void __exit elevatorExit(void) //terminates the elevator module
     struct pet *p, *tmp;
     int i;
 
-    STUB_start_Elevator = NULL;
-    STUB_issue_Request = NULL;
-    STUB_stop_Elevator = NULL;
+    STUB_start_elevator = NULL;
+    STUB_issue_request = NULL;
+    STUB_stop_elevator = NULL;
 
     kthread_stop(elevator.thread);
     proc_remove(proc_entry);
@@ -483,9 +483,9 @@ static int __init elevatorInit(void) //initating the elevator
         return -ENOMEM;
     }
 
-    STUB_start_Elevator = startElevator;
-    STUB_issue_Request = floorRequest;
-    STUB_stop_Elevator = stopElevator;
+    STUB_start_elevator = startElevator;
+    STUB_issue_request = floorRequest;
+    STUB_stop_elevator = stopElevator;
     
     return 0;
 }
