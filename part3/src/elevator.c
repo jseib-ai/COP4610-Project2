@@ -361,47 +361,6 @@ static int elevatorThread(void *data) //The main logic for moving across floors
     return 0;
 }
 
-static int __init elevatorInit(void) //initating the elevator
-{
-    int i;
-    mutex_init(&elevatorMutex);
-
-    elevator.state = IDLE;
-    elevator.currentFloor = 1;
-    elevator.currentWeight = 0;
-    elevator.numPets = 0;
-    elevator.totalServiced = 0;
-    elevator.totalWaiting = 0;
-    elevator.stop = 0;
-    INIT_LIST_HEAD(&elevator.pets); //declaration of elevator variables
-
-    for (i = 0; i < MAX_FLOORS; i++) 
-    {
-        INIT_LIST_HEAD(&floors[i].pets);
-        floors[i].numPets = 0;
-    }
-
-    STUB_startElevator = startElevator;
-    STUB_issueRequest = floorRequest;
-    STUB_stopElevator = stopElevator;
-
-    elevator.thread = kthread_run(elevatorThread, NULL, "elevatorThread");
-    if (IS_ERR(elevator.thread)) 
-    {
-        printk(KERN_ERR "elevator: failed to create thread\n");
-        return PTR_ERR(elevator.thread);
-    }
-
-    proc_entry = proc_create("elevator", 0444, NULL, &elevatorFops);
-    if (!proc_entry) 
-    {
-        kthread_stop(elevator.thread);
-        return -ENOMEM;
-    }
-
-    printk(KERN_INFO "Pet Elevator: module loaded\n");
-    return 0;
-}
 
 
 static int showProc(struct seq_file *m, void *v) 
@@ -471,6 +430,50 @@ static const struct proc_ops elevatorFops = {
     .proc_read = seq_read,
     .proc_lseek = seq_lseek,
     .proc_release = single_release, }; //operations for the procs
+
+
+
+static int __init elevatorInit(void) //initating the elevator
+{
+    int i;
+    mutex_init(&elevatorMutex);
+
+    elevator.state = IDLE;
+    elevator.currentFloor = 1;
+    elevator.currentWeight = 0;
+    elevator.numPets = 0;
+    elevator.totalServiced = 0;
+    elevator.totalWaiting = 0;
+    elevator.stop = 0;
+    INIT_LIST_HEAD(&elevator.pets); //declaration of elevator variables
+
+    for (i = 0; i < MAX_FLOORS; i++) 
+    {
+        INIT_LIST_HEAD(&floors[i].pets);
+        floors[i].numPets = 0;
+    }
+
+    STUB_startElevator = startElevator;
+    STUB_issueRequest = floorRequest;
+    STUB_stopElevator = stopElevator;
+
+    elevator.thread = kthread_run(elevatorThread, NULL, "elevatorThread");
+    if (IS_ERR(elevator.thread)) 
+    {
+        printk(KERN_ERR "elevator: failed to create thread\n");
+        return PTR_ERR(elevator.thread);
+    }
+
+    proc_entry = proc_create("elevator", 0444, NULL, &elevatorFops);
+    if (!proc_entry) 
+    {
+        kthread_stop(elevator.thread);
+        return -ENOMEM;
+    }
+
+    printk(KERN_INFO "Pet Elevator: module loaded\n");
+    return 0;
+}
 
 module_init(elevatorInit); //initialize
 module_exit(elevatorExit); //cleanup
