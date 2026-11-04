@@ -6,6 +6,9 @@
 #include <linux/seq_file.h>
 #include <linux/time64.h>
 #include <linux/timekeeping.h>
+#include <linux/kthread.h>
+#include <linux/slab.h>
+#include <linux/delay.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Nathan Agosto");
