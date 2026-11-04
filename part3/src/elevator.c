@@ -102,7 +102,6 @@ static void __exit elevatorExit(void) //terminates the elevator module
         }
     }
     mutex_unlock(&elevatorMutex);
-    printk(KERN_INFO "elevator: module unloaded\n");
 }
 
 static int weightGet(int type) //Pet determines weight
@@ -412,7 +411,7 @@ static int showProc(struct seq_file *m, void *v)
     {
         seq_printf(m, " %c%d", PetID(p->type), p->dest);
     }
-    seq_printf(m, "\n\n");
+    seq_printf(m, "\n");
 
     for (i = MAX_FLOORS; i >= 1; i--) 
     {
@@ -428,9 +427,9 @@ static int showProc(struct seq_file *m, void *v)
         seq_printf(m, "\n");
     }
 
-    seq_printf(m, "\nNumber of passengers: %d\n", elevator.numPets);
-    seq_printf(m, "Number of passengers waiting: %d\n", elevator.totalWaiting);
-    seq_printf(m, "Number of passengers serviced: %d\n", elevator.totalServiced);
+    seq_printf(m, "\nNumber of pets: %d\n", elevator.numPets);
+    seq_printf(m, "Number of pets waiting: %d\n", elevator.totalWaiting);
+    seq_printf(m, "Number of pets serviced: %d\n", elevator.totalServiced);
 
     mutex_unlock(&elevatorMutex);
     return 0;
@@ -483,8 +482,6 @@ static int __init elevatorInit(void) //initating the elevator
         kthread_stop(elevator.thread);
         return -ENOMEM;
     }
-
-    printk(KERN_INFO "Pet Elevator: module loaded\n");
 
     STUB_start_Elevator = startElevator;
     STUB_issue_Request = floorRequest;
