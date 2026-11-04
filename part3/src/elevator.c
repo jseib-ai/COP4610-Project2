@@ -143,6 +143,7 @@ static void petLoad (void) //loading the pets onto the elevator
 {
     struct pet *p, *tmp;
     int indexFloor = elevator.currentFloor - 1;
+    int loaded = 0;
 
     list_for_each_entry_safe(p, tmp, &floors[indexFloor].pets, list) 
     {
@@ -157,13 +158,19 @@ static void petLoad (void) //loading the pets onto the elevator
         list_add_tail(&p->list, &elevator.pets);
         elevator.numPets++;
         elevator.currentWeight += p->weight;
-        ssleep(1);
+        loaded++;
     }
+    return loaded;
 }
+
+
+
 
 static void petUnload(void) //for unloading the pets
 {
     struct pet *p, *tmp;
+    int unloaded = 0;
+    
     list_for_each_entry_safe(p, tmp, &elevator.pets, list)
     {
         if (p->dest == elevator.currentFloor) 
@@ -173,10 +180,11 @@ static void petUnload(void) //for unloading the pets
             elevator.totalServiced++;
             list_del(&p->list);
             kfree(p);
-            ssleep(1);
+            unloaded++;
         }
     }
-}
+    return unloaded;
+}    
 
 static int startElevator(void)
 {
