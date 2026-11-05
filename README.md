@@ -4,7 +4,7 @@ A Linux kernel module that simulates an elevator system transporting different t
 
 ## Group Members
 - John Seibold: jcs22l@fsu.edu
-- Nathan Agosto: [School Email]
+- Nathan Agosto: na24l@fsu.edu
 
 ## Division of Labor
 
@@ -21,7 +21,7 @@ A Linux kernel module that simulates an elevator system transporting different t
   - Implement pet loading and unloading - Nathan
   - Enforce elevator capacity and weight restrictions - Nathan
   - Implement elevator movement between floors - John
-  - Create the `/proc/elevator` interface to display elevator status - NAthan
+  - Create the `/proc/elevator` interface to display elevator status - Nathan
   - Connect the elevator module to custom system calls - John
 
 
@@ -109,9 +109,15 @@ cat /proc/elevator
 
 ### John Seibold
 | Date | Work Completed / Notes |
-| 10/20 | Part 2  - Mytimer kernel module|
+| 10/20 | Part 2  - Mytimer kernel module |
 | 10/30 | Part 3 steps 1-3 - Kernel compilation/syscall testing |
 | 11/01 - 11/04 | Part 3 - Documentation, Testing elevator, Debugging | 
+
+### Nathan Agosto
+| Date | Work Completed / Notes |
+| 10/17 | Part 1  - System-call tracing |
+| 10/29 - 11/2 | Part 3 steps 4 - Elevator Implementation |
+| 11/3-11/4 | Part 3 - Elevator cleanup, makefile |
 
 
 ## Meetings
