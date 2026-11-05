@@ -1,5 +1,5 @@
 
-obj-m += elevator.o
+obj-m += src/elevator.o
 
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
