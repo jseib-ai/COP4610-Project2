@@ -111,13 +111,13 @@ cat /proc/elevator
 | Date | Work Completed / Notes |
 | 10/20 | Part 2  - Mytimer kernel module |
 | 10/30 | Part 3 steps 1-3 - Kernel compilation/syscall testing |
-| 11/01 - 11/04 | Part 3 - Documentation, Testing elevator, Debugging | 
+| 11/01 - 11/04 | Part 3 - Documentation, Testing elevator, Debugging, makeFile | 
 
 ### Nathan Agosto
 | Date | Work Completed / Notes |
 | 10/17 | Part 1  - System-call tracing |
 | 10/29 - 11/2 | Part 3 steps 4 - Elevator Implementation |
-| 11/3-11/4 | Part 3 - Elevator cleanup, makefile |
+| 11/3 | Part 3 - Elevator cleanup |
 
 
 ## Meetings
